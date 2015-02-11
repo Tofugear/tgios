@@ -96,6 +96,10 @@ module Tgios
           @loading = false
         end
       end
+
+      unless @events[:reach_bottom].nil? || indexPath.row < @list.length - 1
+        @events[:reach_bottom].call(indexPath)
+      end
     end
     
     def tableView(tableView, commitEditingStyle: editingStyle, forRowAtIndexPath: index_path)
