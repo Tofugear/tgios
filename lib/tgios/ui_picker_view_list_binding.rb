@@ -56,7 +56,6 @@ module Tgios
 
     def reload(list=nil)
       @list = WeakRef.new(list) if list
-      NSLog "#{@list.length}====="
       @picker_view.reloadAllComponents
     end
 
