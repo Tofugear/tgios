@@ -54,6 +54,12 @@ module Tgios
       @picker_view.selectRow(idx, inComponent:0, animated: false)
     end
 
+    def reload(list=nil)
+      @list = WeakRef.new(list) if list
+      NSLog "#{@list.length}====="
+      @picker_view.reloadAllComponents
+    end
+
     def onPrepareForRelease
       @events=nil
       @picker_view.dataSource=nil
