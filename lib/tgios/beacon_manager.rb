@@ -1,3 +1,8 @@
+# Localize authorization request alert in your Localizable.strings
+# "Tgios::BeaconManager.request_alert.title.denied" = "Location services are off";
+# "Tgios::BeaconManager.request_alert.title.disabled" = "Background location is not enabled";
+# "Tgios::BeaconManager.request_alert.message" = "To use background location you must turn on 'Always' in the Location Services Settings";
+
 module Tgios
   class FakeBeacon
     attr_accessor :proximityUUID, :major, :minor
@@ -115,10 +120,17 @@ module Tgios
     def request_authorization(manager)
       if manager.respond_to?(:requestAlwaysAuthorization)
         status = CLLocationManager.authorizationStatus
-        if status != KCLAuthorizationStatusAuthorizedAlways
-          title = (status == KCLAuthorizationStatusDenied) ? "Location services are off" : "Background location is not enabled"
-          message = "To use background location you must turn on 'Always' in the Location Services Settings"
+        if status == KCLAuthorizationStatusAuthorizedWhenInUse || status == KCLAuthorizationStatusDenied
+          denied_title = 'Tgios::BeaconManager.request_alert.title.denied'._
+          denied_title = 'Location services are off' if denied_title == 'Tgios::BeaconManager.request_alert.title.denied'
 
+          disabled_title = 'Tgios::BeaconManager.request_alert.title.disabled'._
+          disabled_title = 'Background location is not enabled' if disabled_title == 'Tgios::BeaconManager.request_alert.title.disabled'
+
+          message = 'Tgios::BeaconManager.request_alert.message'._
+          message = "To use background location you must turn on 'Always' in the Location Services Settings" if message == 'Tgios::BeaconManager.request_alert.message'
+
+          title = (status == KCLAuthorizationStatusDenied) ? denied_title : disabled_title
           UIAlertView.alert(title, message: message)
         else
           manager.requestAlwaysAuthorization
