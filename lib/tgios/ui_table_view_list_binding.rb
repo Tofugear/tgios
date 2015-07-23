@@ -30,6 +30,7 @@ module Tgios
       @list=WeakRef.new(list)
       @page = 1
       @total = nil
+      @loading = nil
     end
 
     def build_cell(cell_identifier)
