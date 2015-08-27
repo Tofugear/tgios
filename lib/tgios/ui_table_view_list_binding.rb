@@ -91,7 +91,7 @@ module Tgios
           if success && !@list.nil?
             @total = total
             @page += 1
-            @list += results
+            @list.concat(results)
             @tableView.reloadData
           end
           @loading = false
