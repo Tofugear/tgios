@@ -7,7 +7,7 @@ module Tgios
       self.view.backgroundColor = :dark_gray.uicolor
       @load_view = Tgios::LoadingView.add_loading_view_to(self.view)
       @load_view.start_loading
-      if Device.simulator?
+      if NSProcessInfo.processInfo.environment[:IPHONE_SIMULATOR_DEVICE].present?
         self.performSelector('fake_scan', withObject: nil, afterDelay: 3)
       else
         self.performSelector('startScanning', withObject: nil, afterDelay: 0.5)
