@@ -1,8 +1,9 @@
 module Tgios
   class TableSectionListBinding < BindingBase
-    Events = [:cell_identifier, :build_cell, :update_cell,
+    Events = [:cell_identifier, :build_cell, :update_cell, :update_accessory,
         :get_section, :get_section_text, :get_section_footer_text, :get_rows, :get_row, :get_row_text, :get_row_detail_text,
-        :touch_row, :cell_height, :section_header, :section_footer, :reach_bottom, :header_height, :footer_height
+        :touch_row, :delete_row, :can_delete_row,
+        :cell_height, :section_header, :section_footer, :reach_bottom, :header_height, :footer_height
     ]
 
     def initialize(table_view, list, options={})
@@ -134,6 +135,26 @@ module Tgios
       if @events.has_key?(:touch_row)
         record = @events[:get_row].call(index_path)
         @events[:touch_row].call(record, index_path)
+      end
+    end
+
+    def tableView(tableView, commitEditingStyle: editingStyle, forRowAtIndexPath: index_path)
+      if editingStyle == UITableViewCellEditingStyleDelete
+        if @events[:delete_row].present?
+          record = @events[:get_row].call(index_path)
+          @events[:delete_row].call(index_path, record) do |success|
+            tableView.deleteRowsAtIndexPaths([index_path], withRowAnimation: UITableViewRowAnimationFade) if success
+          end
+        end
+      end
+    end
+
+    def tableView(tableView, canEditRowAtIndexPath:index_path)
+      if @events[:can_delete_row].present?
+        record = @events[:get_row].call(index_path)
+        @events[:can_delete_row].call(index_path, record)
+      else
+        @events[:delete_row].present?
       end
     end
 
