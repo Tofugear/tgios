@@ -2,7 +2,7 @@ module Tgios
   class TableSectionListBinding < BindingBase
     Events = [:cell_identifier, :build_cell, :update_cell, :update_accessory,
         :get_section, :get_section_text, :get_section_footer_text, :get_rows, :get_row, :get_row_text, :get_row_detail_text,
-        :touch_row, :delete_row, :can_delete_row,
+        :touch_row, :delete_row, :can_delete_row, :should_indent, :editing_style,
         :cell_height, :section_header, :section_footer, :reach_bottom, :header_height, :footer_height
     ]
 
@@ -217,6 +217,23 @@ module Tgios
       0
     end
 
+    def tableView(tableView, shouldIndentWhileEditingRowAtIndexPath:index_path)
+      flag = if @events.has_key?(:should_indent)
+               record = @events[:get_row].call(index_path)
+               @events[:should_indent].call(index_path, record)
+             end
+      return flag unless flag.nil?
+      true
+    end
+
+    def tableView(tableView, editingStyleForRowAtIndexPath:index_path)
+      style = if @events.has_key?(:editing_style)
+               record = @events[:get_row].call(index_path)
+               @events[:editing_style].call(index_path, record)
+             end
+      return style unless style.nil?
+      UITableViewCellEditingStyleDelete
+    end
 
     def tableView(tableView, willDisplayCell:cell, forRowAtIndexPath:index_path)
       unless @events[:reach_bottom].nil? || index_path.section < @list.length - 1 || index_path.row < @events[:get_rows].call(index_path).length - 1
