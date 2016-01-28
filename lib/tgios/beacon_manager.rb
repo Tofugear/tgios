@@ -30,17 +30,32 @@ module Tgios
       @default
     end
 
-    def initialize(uuid, range_limit=-70, background=false, tolerance=5, range_method=:rssi)
+    #############################################
+    # range_method: :rssi or :accuracy
+    # range_limit: around -70 for :rssi / around 1.5 (meters) for :accuracy
+    # tolerance: number of times a beacon is ranged continuously required to trigger beacon changed event
+    # background: range beacons when device is in background
+    #############################################
+
+    def initialize(options)
       @events = {}
       @previous_beacons = []
-      @background = background
-      @tolerance = (tolerance || 5)
+      @background = options[:background]
+      @tolerance = (options[:tolerance] || 5)
 
-      @uuid = NSUUID.alloc.initWithUUIDString(uuid)
-      @range_method = range_method
-      @range_limit = range_limit
+      @uuid = NSUUID.alloc.initWithUUIDString(options[:uuid])
+      @major = options[:major]
+      @minor = options[:minor]
+      @range_method = (options[:range_method] || :rssi)
+      @range_limit = (options[:range_limit] || -70)
 
-      @region = CLBeaconRegion.alloc.initWithProximityUUID(@uuid, identifier: uuid.split('-').first)
+      @region = if @major && @minor
+                  CLBeaconRegion.alloc.initWithProximityUUID(@uuid, major: @major, minor: @minor, identifier: identifier)
+                elsif @major
+                  CLBeaconRegion.alloc.initWithProximityUUID(@uuid, major: @major, identifier: identifier)
+                else
+                  CLBeaconRegion.alloc.initWithProximityUUID(@uuid, identifier: identifier)
+                end
       @region.notifyOnEntry = true
       @region.notifyOnExit = true
       @region.notifyEntryStateOnDisplay = true
@@ -49,6 +64,11 @@ module Tgios
 
       UIApplicationWillEnterForegroundNotification.add_observer(self, 'on_enter_foreground:')
       UIApplicationDidEnterBackgroundNotification.add_observer(self, 'on_enter_background:')
+
+    end
+
+    def identifier
+      [@uuid.UUIDString, @major, @minor].join('/')
     end
 
     def on(event_key,&block)
