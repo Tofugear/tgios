@@ -5,7 +5,7 @@
 
 module Tgios
   class FakeBeacon
-    attr_accessor :proximityUUID, :major, :minor
+    attr_accessor :proximityUUID, :major, :minor, :accuracy, :proximity, :rssi
 
     def initialize(attributes)
       attributes.each do |k, v|
