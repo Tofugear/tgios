@@ -27,6 +27,16 @@ module Tgios
       @session.sessionPreset = AVCaptureSessionPresetHigh
 
       @device = AVCaptureDevice.defaultDeviceWithMediaType AVMediaTypeVideo
+      if @device.lockForConfiguration(nil)
+        if @device.isFocusModeSupported(AVCaptureFocusModeContinuousAutoFocus)
+          @device.focusMode = AVCaptureFocusModeContinuousAutoFocus
+        end
+        if @device.isAutoFocusRangeRestrictionSupported
+          @device.autoFocusRangeRestriction = AVCaptureAutoFocusRangeRestrictionNear
+        end
+        @device.unlockForConfiguration
+      end
+
       @error = Pointer.new('@')
       @input = AVCaptureDeviceInput.deviceInputWithDevice @device, error: @error
 
