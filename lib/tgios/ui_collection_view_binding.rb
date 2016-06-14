@@ -43,6 +43,18 @@ module Tgios
       @events[:item_tapped].call(view_at(indexPath), indexPath.row) unless @events[:item_tapped].nil?
     end
 
+    def collectionView(collectionView, layout:collectionViewLayout, sizeForItemAtIndexPath:indexPath)
+      size = if @events[:item_size].nil?
+               view_at(indexPath).bounds.size
+             else
+               @events[:item_size].call(view_at(indexPath), indexPath)
+             end
+      unless size && size != CGSizeZero
+        size = collectionViewLayout.itemSize
+      end
+      size
+    end
+
     def scrollViewDidEndDecelerating(scrollView)
       page = (scrollView.contentOffset.x / scrollView.frame.size.width).round
       if page != @current_page
