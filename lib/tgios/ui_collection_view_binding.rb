@@ -45,7 +45,7 @@ module Tgios
 
     def collectionView(collectionView, layout:collectionViewLayout, sizeForItemAtIndexPath:indexPath)
       size = if @events[:item_size].nil?
-               view_at(indexPath).bounds.size
+               view_at(indexPath).try(:bounds).try(:size)
              else
                @events[:item_size].call(view_at(indexPath), indexPath)
              end
