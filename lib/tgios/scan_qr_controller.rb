@@ -10,9 +10,27 @@ module Tgios
       if NSProcessInfo.processInfo.environment[:IPHONE_SIMULATOR_DEVICE].present?
         self.performSelector('fake_scan', withObject: nil, afterDelay: 3)
       else
-        self.performSelector('startScanning', withObject: nil, afterDelay: 0.5)
+        check_permission
+        # self.performSelector('startScanning', withObject: nil, afterDelay: 0.5)
       end
 
+    end
+
+    def check_permission
+      status = AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)
+      if status == AVAuthorizationStatusAuthorized
+        self.performSelector('startScanning', withObject: nil, afterDelay: 0.5)
+      elsif status == AVAuthorizationStatusNotDetermined
+        AVCaptureDevice.requestAccessForMediaType(AVMediaTypeVideo, completionHandler: ->(granted) {
+              if (granted)
+                startScanning
+              else
+                @events[:permission_denied].call if @events[:permission_denied]
+              end
+            })
+      else
+        @events[:permission_denied].call if @events[:permission_denied]
+      end
     end
 
     def startScanning
