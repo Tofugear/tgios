@@ -21,13 +21,19 @@ module Tgios
       if status == AVAuthorizationStatusAuthorized
         self.performSelector('startScanning', withObject: nil, afterDelay: 0.5)
       elsif status == AVAuthorizationStatusNotDetermined
-        AVCaptureDevice.requestAccessForMediaType(AVMediaTypeVideo, completionHandler: ->(granted) {
-              if (granted)
-                startScanning
-              else
-                @events[:permission_denied].call if @events[:permission_denied]
-              end
-            })
+        Dispatch::Queue.new('ScanQrController').async do
+          AVCaptureDevice.requestAccessForMediaType(AVMediaTypeVideo, completionHandler: ->(granted) {
+                if granted
+                  Dispatch::Queue.main.async do
+                    startScanning
+                  end
+                else
+                  Dispatch::Queue.main.async do
+                    @events[:permission_denied].call if @events[:permission_denied]
+                  end
+                end
+              })
+        end
       else
         @events[:permission_denied].call if @events[:permission_denied]
       end
