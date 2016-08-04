@@ -35,7 +35,7 @@ module Tgios
       @search_bar.sizeToFit
       @search_bar.delegate=self
       @search_result_table.tableHeaderView=@search_bar
-      @search_bar.becomeFirstResponder unless @hide_keyboard
+      @search_bar.performSelector('becomeFirstResponder', withObject: nil, afterDelay: 0.0) unless @hide_keyboard
       @events[:after_layout].call(@search_bar, @search_result_table) unless @events[:after_layout].nil?
 
     end
@@ -62,6 +62,16 @@ module Tgios
           end
         end
       end
+    end
+
+    def viewWillAppear(animated)
+      super
+      @search_result_table_binding.listen_to_keyboard
+    end
+
+    def viewWillDisappear(animated)
+      @search_result_table_binding.stop_listen_to_keyboard
+      super
     end
 
     def init

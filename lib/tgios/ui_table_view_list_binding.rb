@@ -12,6 +12,11 @@ module Tgios
       @tableView.delegate=self
       @display_field=display_field
       set_list(list)
+      if @table_utility_binding.nil?
+        @table_utility_binding = UITableViewUtilityBinding.new.bind(@tableView)
+      else
+        @table_utility_binding.bind(@tableView)
+      end
       @options=(options || {})
       return self
     end
@@ -129,7 +134,16 @@ module Tgios
       can_edit
     end
 
+    def listen_to_keyboard
+      @table_utility_binding.listen_to_keyboard
+    end
+
+    def stop_listen_to_keyboard
+      @table_utility_binding.stop_listen_to_keyboard
+    end
+
     def onPrepareForRelease
+      @table_utility_binding.prepareForRelease
       @events=nil
       @list=nil
       @display_field=nil
