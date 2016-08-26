@@ -90,21 +90,23 @@ module Tgios
     end
 
     def tableView(tableView, willDisplayCell:cell, forRowAtIndexPath:indexPath)
-      unless @events[:load_more].nil? || indexPath.row < @list.length - 1 || !@total.nil? && @total <= @list.count || @loading
-        @loading = true
-        @events[:load_more].call(@page+1, indexPath) do |success, results, total|
-          if success && !@list.nil?
-            @total = total
-            @page += 1
-            @list.concat(results)
-            @tableView.reloadData
+      if indexPath.row >= @list.length - 1
+        unless @events[:load_more].nil? || !@total.nil? && @total <= @list.size || @loading
+          @loading = true
+          @events[:load_more].call(@page+1, indexPath) do |success, results, total|
+            if success && !@list.nil?
+              @total = total
+              @page += 1
+              @list.concat(results)
+              @tableView.reloadData
+            end
+            @loading = false
           end
-          @loading = false
         end
-      end
 
-      unless @events[:reach_bottom].nil? || indexPath.row < @list.length - 1
-        @events[:reach_bottom].call(indexPath)
+        unless @events[:reach_bottom].nil?
+          @events[:reach_bottom].call(indexPath)
+        end
       end
     end
     
