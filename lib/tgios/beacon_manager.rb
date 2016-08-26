@@ -88,6 +88,10 @@ module Tgios
       NSLog 'didEnterRegion'
       if region.isKindOfClass(CLBeaconRegion)
         manager.startRangingBeaconsInRegion(region)
+        if has_event(:enter_region)
+          @events[:enter_region].call(region)
+        end
+        EnterRegionKey.post_notification(self, {region: region})
       end
     end
 
@@ -98,6 +102,7 @@ module Tgios
         if has_event(:exit_region)
           @events[:exit_region].call(region)
         end
+        ExitRegionKey.post_notification(self, {region: region})
       end
     end
 
@@ -126,7 +131,7 @@ module Tgios
       end
 
       BeaconFoundKey.post_notification(self, {region: region, beacon: @current_beacon})
-      BeaconsFoundKey.post_notification(self, {region: region, beacons_in_range: beacons_in_range, any_beacons: known_beacons + unknown_beacons})
+      BeaconsFoundKey.post_notification(self, {region: region, beacon: @current_beacon, beacons_in_range: beacons_in_range, any_beacons: known_beacons + unknown_beacons})
     end
 
     def location_manager
