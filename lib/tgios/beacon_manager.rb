@@ -19,6 +19,7 @@ module Tgios
     attr_accessor :range_method, :range_limit, :tolerance, :current_beacon, :background
 
     BeaconFoundKey = 'Tgios::BeaconManager::BeaconFound'
+    BeaconsFoundKey = 'Tgios::BeaconManager::BeaconsFound'
     EnterRegionKey = 'Tgios::BeaconManager::EnterRegion'
     ExitRegionKey = 'Tgios::BeaconManager::ExitRegion'
 
@@ -125,6 +126,7 @@ module Tgios
       end
 
       BeaconFoundKey.post_notification(self, {region: region, beacon: @current_beacon})
+      BeaconsFoundKey.post_notification(self, {region: region, beacons_in_range: beacons_in_range, any_beacons: known_beacons + unknown_beacons})
     end
 
     def location_manager
