@@ -81,29 +81,20 @@ module Tgios
       NSLog "didDetermineState #{state}"
       if state == CLRegionStateInside
         manager.startRangingBeaconsInRegion(region)
+        did_enter_region(region)
+      elsif state == CLRegionStateOutside
+        did_exit_region(region)
       end
     end
 
     def locationManager(manager, didEnterRegion: region)
       NSLog 'didEnterRegion'
-      if region.isKindOfClass(CLBeaconRegion)
-        manager.startRangingBeaconsInRegion(region)
-        if has_event(:enter_region)
-          @events[:enter_region].call(region)
-        end
-        EnterRegionKey.post_notification(self, {region: region})
-      end
+      did_enter_region(region)
     end
 
     def locationManager(manager, didExitRegion: region)
       NSLog 'didExitRegion'
-      if region.isKindOfClass(CLBeaconRegion)
-        manager.stopRangingBeaconsInRegion(region)
-        if has_event(:exit_region)
-          @events[:exit_region].call(region)
-        end
-        ExitRegionKey.post_notification(self, {region: region})
-      end
+      did_exit_region(region)
     end
 
     def locationManager(manager, didRangeBeacons: beacons, inRegion: region)
@@ -184,6 +175,26 @@ module Tgios
     def on_enter_background(noti)
       NSLog 'on_enter_background'
       stop_monitor unless @background
+    end
+
+    def did_enter_region(region)
+      if region.isKindOfClass(CLBeaconRegion)
+        location_manager.startRangingBeaconsInRegion(region)
+        if has_event(:enter_region)
+          @events[:enter_region].call(region)
+        end
+        EnterRegionKey.post_notification(self, {region: region})
+      end
+    end
+
+    def did_exit_region(region)
+      if region.isKindOfClass(CLBeaconRegion)
+        location_manager.stopRangingBeaconsInRegion(region)
+        if has_event(:exit_region)
+          @events[:exit_region].call(region)
+        end
+        ExitRegionKey.post_notification(self, {region: region})
+      end
     end
 
     def has_event(event)
