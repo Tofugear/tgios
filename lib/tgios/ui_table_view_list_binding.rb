@@ -49,7 +49,8 @@ module Tgios
     end
 
     def update_cell_text(record, cell, index_path)
-      cell.textLabel.text=record[@display_field]
+      text = record.is_a?(Hash) ? record[@display_field] : record.send(@display_field)
+      cell.textLabel.text=text.to_s
       cell
     end
 
