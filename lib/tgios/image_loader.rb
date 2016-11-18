@@ -3,7 +3,7 @@ module Tgios
 
     def initialize(url)
       super
-      @url = url
+      @url = url.stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding)
       @events = {}
     end
 
