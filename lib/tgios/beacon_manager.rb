@@ -34,15 +34,19 @@ module Tgios
     #############################################
     # range_method: :rssi or :accuracy
     # range_limit: around -70 for :rssi / around 1.5 (meters) for :accuracy
-    # tolerance: number of times a beacon is ranged continuously required to trigger beacon changed event
     # background: range beacons when device is in background
+    # algorithm: :continue or :timeout
+    # tolerance: for algorithm continue: number of times a beacon is ranged continuously required to trigger beacon changed event, for algorithm timeout: time in seconds for a beacon marked as changed
     #############################################
 
     def initialize(options)
       @events = {}
-      @previous_beacons = []
       @background = options[:background]
+
+      @algorithm = options[:algorithm]
       @tolerance = (options[:tolerance] || 5)
+      @previous_beacons = []
+      @beacons_last_seen_at = {}
 
       @uuid = NSUUID.alloc.initWithUUIDString(options[:uuid])
       @major = options[:major]
@@ -75,6 +79,13 @@ module Tgios
     def on(event_key,&block)
       @events[event_key] = block.weak!
       self
+    end
+
+    def algorithm=(val)
+      if @algorithm != val
+        @previous_beacons.clear
+      end
+      @algorithm = val
     end
 
     def locationManager(manager, didDetermineState: state, forRegion: region)
@@ -202,17 +213,41 @@ module Tgios
     end
 
     def push_beacon(beacon)
-      if beacon_eqs(beacon, @current_beacon)
-        @current_beacon = beacon
-      else
-        if @previous_beacons.find { |b| !beacon_eqs(beacon, b) }.blank?
-          @current_beacon = beacon
-        else
-          @current_beacon = nil if @previous_beacons.find{ |b| beacon_eqs(@current_beacon, b)}.blank?
-        end
+      case @algorithm
+        when :continue
+          if beacon_eqs(beacon, @current_beacon)
+            @current_beacon = beacon
+          else
+            if @previous_beacons.find { |b| !beacon_eqs(beacon, b) }.blank? # all previous beacons is the new beacon
+              @current_beacon = beacon
+            else
+              @current_beacon = nil if @previous_beacons.find{ |b| beacon_eqs(@current_beacon, b)}.blank? # all previous beacons is not the current beacon
+            end
+          end
+          @previous_beacons << beacon
+          @previous_beacons.delete_at(0) if @previous_beacons.length > @tolerance
+
+        when :timeout
+          time_now = Time.now
+          beacon_hash = {beacon: beacon, time: time_now}
+          @beacons_last_seen_at[self.class.beacon_key(beacon)] = beacon_hash
+
+          @previous_beacons << beacon_hash
+          while @previous_beacons.present? && time_now - @previous_beacons.first[:time] < @tolerance do
+            @previous_beacons.delete_at(0)
+          end
+
+          current_beacon_hash = @beacons_last_seen_at[self.class.beacon_key(@current_beacon)]
+
+          if time_now - current_beacon_hash[:time] < @tolerance
+            @current_beacon = beacon # current beacon not change
+          else
+            count_hash = @previous_beacons.each_with_object(Hash.new(0)) {|e, h| h[self.class.beacon_key(e[:beacon])] += @tolerance - (time_now - e[:time])} # beacon has more weighting if time is later
+
+            max_beacon_key = count_hash.max_by(:last).first
+            @current_beacon = @beacons_last_seen_at[max_beacon_key][:beacon]
+          end
       end
-      @previous_beacons << beacon
-      @previous_beacons.delete_at(0) if @previous_beacons.length > @tolerance
     end
 
     def beacon_eqs(beacon1, beacon2)
@@ -222,6 +257,10 @@ module Tgios
     def self.beacon_eqs(beacon1, beacon2)
       return beacon1 == beacon2 if beacon1.nil? || beacon2.nil?
       beacon1.minor == beacon2.minor && beacon1.major == beacon2.major && beacon1.proximityUUID == beacon2.proximityUUID
+    end
+
+    def self.beacon_key(beacon)
+      [beacon.try(:proximityUUIDbeacon), beacon.try(:major), beacon.try(:minor)].join('/')
     end
 
     def new_fake_beacon(options)
