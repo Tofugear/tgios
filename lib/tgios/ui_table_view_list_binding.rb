@@ -137,6 +137,14 @@ module Tgios
       can_edit
     end
 
+    def scrollViewDidScroll(scroll_view)
+      @events[:did_scroll].call(scroll_view) if @events[:did_scroll]
+    end
+
+    def scrollViewDidEndDragging(scroll_view, willDecelerate:decelerate)
+      @events[:did_end_scroll].call(scroll_view, decelerate) if @events[:did_end_scroll]
+    end
+
     def listen_to_keyboard
       @table_utility_binding.listen_to_keyboard
     end
