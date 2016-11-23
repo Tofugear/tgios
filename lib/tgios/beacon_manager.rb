@@ -232,19 +232,20 @@ module Tgios
           beacon_hash = {beacon: beacon, time: time_now}
           @beacons_last_seen_at[self.class.beacon_key(beacon)] = beacon_hash
 
-          @previous_beacons << beacon_hash
-          while @previous_beacons.present? && time_now - @previous_beacons.first[:time] < @tolerance do
+          while @previous_beacons.present? && time_now - @previous_beacons.first[:time] > @tolerance do
             @previous_beacons.delete_at(0)
           end
+          @previous_beacons << beacon_hash
 
           current_beacon_hash = @beacons_last_seen_at[self.class.beacon_key(@current_beacon)]
+          if current_beacon_hash
 
-          if time_now - current_beacon_hash[:time] < @tolerance
-            @current_beacon = beacon # current beacon not change
+          end
+          if !current_beacon_hash || time_now - current_beacon_hash[:time] < @tolerance
+             # current beacon not change
           else
             count_hash = @previous_beacons.each_with_object(Hash.new(0)) {|e, h| h[self.class.beacon_key(e[:beacon])] += @tolerance - (time_now - e[:time])} # beacon has more weighting if time is later
-
-            max_beacon_key = count_hash.max_by(:last).first
+            max_beacon_key = count_hash.max_by(&:last).first
             @current_beacon = @beacons_last_seen_at[max_beacon_key][:beacon]
           end
       end
