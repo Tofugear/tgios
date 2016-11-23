@@ -17,6 +17,7 @@ module Tgios
 
   class BeaconManager < BindingBase
     attr_accessor :range_method, :range_limit, :tolerance, :current_beacon, :background
+    ALGORITHMS = [:continue, :timeout]
 
     BeaconFoundKey = 'Tgios::BeaconManager::BeaconFound'
     BeaconsFoundKey = 'Tgios::BeaconManager::BeaconsFound'
@@ -41,12 +42,12 @@ module Tgios
 
     def initialize(options)
       @events = {}
-      @background = options[:background]
-
-      @algorithm = options[:algorithm]
-      @tolerance = (options[:tolerance] || 5)
       @previous_beacons = []
       @beacons_last_seen_at = {}
+      @background = options[:background]
+
+      self.algorithm = (options[:algorithm] || :continue)
+      @tolerance = (options[:tolerance] || 5)
 
       @uuid = NSUUID.alloc.initWithUUIDString(options[:uuid])
       @major = options[:major]
@@ -82,10 +83,14 @@ module Tgios
     end
 
     def algorithm=(val)
-      if @algorithm != val
+      alg = val.to_s.to_sym
+      return unless alg.present?
+      if @algorithm != alg
         @previous_beacons.clear
       end
-      @algorithm = val
+      raise ArgumentError.new("Algorithm not found, valid algorithm are: [#{ALGORITHMS.join(', ')}]") unless ALGORITHMS.include?(alg)
+
+      @algorithm = alg
     end
 
     def locationManager(manager, didDetermineState: state, forRegion: region)
