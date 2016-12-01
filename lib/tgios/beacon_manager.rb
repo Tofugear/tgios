@@ -12,6 +12,12 @@ module Tgios
         k = :proximityUUID if k.to_s == 'uuid'
         instance_variable_set("@#{k}", v)
       end
+      @proximityUUID ||= NSUUID.new
+      @major ||= 34702
+      @minor ||= 31202
+      @accuracy ||= 3.0
+      @rssi ||= -85
+      @proximity ||= CLProximityFar
     end
   end
 
@@ -49,23 +55,40 @@ module Tgios
       self.algorithm = (options[:algorithm] || :continue)
       @tolerance = (options[:tolerance] || 5)
 
-      @uuid = NSUUID.alloc.initWithUUIDString(options[:uuid])
-      @major = options[:major]
-      @minor = options[:minor]
       @range_method = (options[:range_method] || :rssi)
       @range_limit = (options[:range_limit] || -70)
 
-      @region = if @major && @minor
-                  CLBeaconRegion.alloc.initWithProximityUUID(@uuid, major: @major, minor: @minor, identifier: identifier)
-                elsif @major
-                  CLBeaconRegion.alloc.initWithProximityUUID(@uuid, major: @major, identifier: identifier)
-                else
-                  CLBeaconRegion.alloc.initWithProximityUUID(@uuid, identifier: identifier)
-                end
-      @region.notifyOnEntry = true
-      @region.notifyOnExit = true
-      @region.notifyEntryStateOnDisplay = true
+      @regions = []
+      region_options = options[:regions]
+      if !region_options.is_a?(Array)
+        region_options = [{uuid: options[:uuid], major: options[:major], minor: options[:minor]}]
+      end
 
+      region_options.each do |region_hash|
+        if region_hash.is_a?(Hash)
+          uuid = region_hash[:uuid]
+          major = region_hash[:major]
+          minor = region_hash[:minor]
+        else
+          uuid = region_hash
+        end
+        uuid = uuid.upcase
+        nsuuid = NSUUID.alloc.initWithUUIDString(uuid)
+        region = if major && minor
+                   CLBeaconRegion.alloc.initWithProximityUUID(nsuuid, major: major, minor: minor, identifier: identifier(uuid, major, minor))
+                 elsif major
+                   CLBeaconRegion.alloc.initWithProximityUUID(nsuuid, major: major, identifier: identifier(uuid, major, minor))
+                 else
+                   CLBeaconRegion.alloc.initWithProximityUUID(nsuuid, identifier: identifier(uuid, major, minor))
+                 end
+        @regions << {region: region, active: false}
+
+        region.notifyOnEntry = true
+        region.notifyOnExit = true
+        region.notifyEntryStateOnDisplay = true
+      end
+
+      central_manager
       start_monitor
 
       UIApplicationWillEnterForegroundNotification.add_observer(self, 'on_enter_foreground:')
@@ -73,8 +96,8 @@ module Tgios
 
     end
 
-    def identifier
-      [@uuid.UUIDString, @major, @minor].join('/')
+    def identifier(uuid, major, minor)
+      [uuid, major, minor].join('/')
     end
 
     def on(event_key,&block)
@@ -104,16 +127,18 @@ module Tgios
     end
 
     def locationManager(manager, didEnterRegion: region)
-      NSLog 'didEnterRegion'
       did_enter_region(region)
     end
 
     def locationManager(manager, didExitRegion: region)
-      NSLog 'didExitRegion'
       did_exit_region(region)
     end
 
     def locationManager(manager, didRangeBeacons: beacons, inRegion: region)
+
+      region_hash = get_region_hash(region)
+      return unless region_hash[:active]
+
       beacons = beacons.sort_by{|b| b.try(@range_method)}
       beacons = beacons.reverse if @range_method == :rssi
       known_beacons = beacons.select{|b| b.proximity != CLProximityUnknown}
@@ -124,7 +149,7 @@ module Tgios
       
       NSLog("beacons_in_range: ")
       beacons_in_range.each_with_index do |bir, i|
-        NSLog("##{i}: major: #{bir.major}, minor: #{bir.minor}, accuracy: #{bir.accuracy}, rssi: #{bir.rssi}")
+        NSLog("##{i}: major: #{bir.major}, minor: #{bir.minor}, accuracy: #{bir.accuracy.round(3)}, rssi: #{bir.rssi}")
       end
       push_beacon(beacon) # nil value will signify null beacon
 
@@ -139,6 +164,10 @@ module Tgios
 
       BeaconFoundKey.post_notification(self, {region: region, beacon: @current_beacon})
       BeaconsFoundKey.post_notification(self, {region: region, beacon: @current_beacon, beacons_in_range: beacons_in_range, any_beacons: known_beacons + unknown_beacons})
+    end
+
+    def locationManager(manager, rangingBeaconsDidFailForRegion: region, withError: error)
+      @events[:ranging_failed].call(region, error) if has_event(:ranging_failed)
     end
 
     def location_manager
@@ -174,27 +203,35 @@ module Tgios
     end
 
     def start_monitor
-      location_manager.startMonitoringForRegion(@region)
-      location_manager.requestStateForRegion(@region)
+      @regions.each do |region_hash|
+        region = region_hash[:region]
+        location_manager.startMonitoringForRegion(region)
+        location_manager.requestStateForRegion(region)
+      end
     end
 
     def stop_monitor
-      location_manager.stopRangingBeaconsInRegion(@region)
-      location_manager.stopMonitoringForRegion(@region)
+      @regions.each do |region_hash|
+        region = region_hash[:region]
+        location_manager.stopRangingBeaconsInRegion(region)
+        location_manager.stopMonitoringForRegion(region)
+      end
     end
 
     def on_enter_foreground(noti)
-      NSLog 'on_enter_foreground'
       self.performSelector('start_monitor', withObject: nil, afterDelay:1)
     end
 
     def on_enter_background(noti)
-      NSLog 'on_enter_background'
       stop_monitor unless @background
     end
 
     def did_enter_region(region)
       if region.isKindOfClass(CLBeaconRegion)
+
+        region_hash = get_region_hash(region)
+        region_hash[:active] = true
+
         location_manager.startRangingBeaconsInRegion(region)
         if has_event(:enter_region)
           @events[:enter_region].call(region)
@@ -205,11 +242,38 @@ module Tgios
 
     def did_exit_region(region)
       if region.isKindOfClass(CLBeaconRegion)
+
+        region_hash = get_region_hash(region)
+        region_hash[:active] = false
+
         location_manager.stopRangingBeaconsInRegion(region)
+        @previous_beacons.delete_if {|b| self.class.beacon_in_region(b, region)}
+        if self.class.beacon_in_region(@current_beacon, region)
+          @current_beacon = nil
+        end
         if has_event(:exit_region)
           @events[:exit_region].call(region)
         end
         ExitRegionKey.post_notification(self, {region: region})
+      end
+    end
+
+    def central_manager
+      @central_manager ||= CBCentralManager.alloc.initWithDelegate(self, queue: nil)
+    end
+
+    def centralManagerDidUpdateState(central)
+      @regions.each do |region_hash|
+        region = region_hash[:region]
+        case central.state
+          when CBCentralManagerStatePoweredOff, CBCentralManagerStateUnsupported, CBCentralManagerStateUnauthorized
+            did_exit_region(region)
+          when CBCentralManagerStatePoweredOn
+            did_enter_region(region)
+          when CBCentralManagerStateResetting
+          when CBCentralManagerStateUnknown
+          else
+        end
       end
     end
 
@@ -253,6 +317,8 @@ module Tgios
             max_beacon_key = count_hash.max_by(&:last).first
             @current_beacon = @beacons_last_seen_at[max_beacon_key][:beacon]
           end
+        else
+          @current_beacon = beacon
       end
     end
 
@@ -262,16 +328,47 @@ module Tgios
 
     def self.beacon_eqs(beacon1, beacon2)
       return beacon1 == beacon2 if beacon1.nil? || beacon2.nil?
-      beacon1.minor == beacon2.minor && beacon1.major == beacon2.major && beacon1.proximityUUID == beacon2.proximityUUID
+      beacon1.minor == beacon2.minor && beacon1.major == beacon2.major && beacon1.proximityUUID.UUIDString.upcase == beacon2.proximityUUID.UUIDString.upcase
+    end
+
+    def self.region_eqs(region1, region2)
+      return region1 == region2 if region1.nil? || region2.nil?
+      region1.identifier.upcase == region2.identifier.upcase
+    end
+
+    def self.beacon_in_region(beacon, region)
+      return false unless beacon
+
+      match = beacon.proximityUUID == region.proximityUUID
+      return false unless match
+      major = region.major
+      if major
+        match = match && beacon.major == major
+        return false unless match
+        minor = region.minor
+        if minor
+          match = match && beacon.minor == minor
+        end
+      end
+      match
     end
 
     def self.beacon_key(beacon)
-      [beacon.try(:proximityUUIDbeacon), beacon.try(:major), beacon.try(:minor)].join('/')
+      [beacon.try(:proximityUUID).try(:UUIDString).try(:upcase), beacon.try(:major), beacon.try(:minor)].join('/')
     end
 
     def new_fake_beacon(options)
-      FakeBeacon.new({uuid: @uuid}.merge(options))
+      region_hash = @regions.first
+      region = region_hash[:region] if region_hash
+      region_options = region ? {uuid: region.proximityUUID, major: region.major, minor: region.minor} : {}
+      FakeBeacon.new(region_options.merge(options))
     end
+
+    def get_region_hash(region)
+      region_hash = @regions.find{|r| self.class.region_eqs(r[:region], region) }
+      region_hash || {}
+    end
+
 
     def self.supported
       CLLocationManager.isRangingAvailable
@@ -285,6 +382,7 @@ module Tgios
       @events = nil
       @current_beacon = nil
       @previous_beacons = nil
+      @regions = []
     end
 
     def dealloc
