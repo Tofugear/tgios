@@ -23,12 +23,15 @@ module Tgios
 
   class BeaconManager < BindingBase
     attr_accessor :range_method, :range_limit, :tolerance, :current_beacon, :background
+    attr_reader :current_bluetooth_state
     ALGORITHMS = [:continue, :timeout]
 
     BeaconFoundKey = 'Tgios::BeaconManager::BeaconFound'
     BeaconsFoundKey = 'Tgios::BeaconManager::BeaconsFound'
+    RangingFailedKey = 'Tgios::BeaconManager::RangingFailed'
     EnterRegionKey = 'Tgios::BeaconManager::EnterRegion'
     ExitRegionKey = 'Tgios::BeaconManager::ExitRegion'
+    BluetoothChangedKey = 'Tgios::BeaconManager::BluetoothChanged'
 
     def self.default=(val)
       @default = val
@@ -168,6 +171,7 @@ module Tgios
 
     def locationManager(manager, rangingBeaconsDidFailForRegion: region, withError: error)
       @events[:ranging_failed].call(region, error) if has_event(:ranging_failed)
+      RangingFailedKey.post_notification(self, {region: region, error: error})
     end
 
     def location_manager
@@ -230,6 +234,7 @@ module Tgios
       if region.isKindOfClass(CLBeaconRegion)
 
         region_hash = get_region_hash(region)
+        return if region_hash.blank?
         region_hash[:active] = true
 
         location_manager.startRangingBeaconsInRegion(region)
@@ -244,6 +249,7 @@ module Tgios
       if region.isKindOfClass(CLBeaconRegion)
 
         region_hash = get_region_hash(region)
+        return if region_hash.blank?
         region_hash[:active] = false
 
         location_manager.stopRangingBeaconsInRegion(region)
@@ -263,9 +269,17 @@ module Tgios
     end
 
     def centralManagerDidUpdateState(central)
+      state = central.state
+      @current_bluetooth_state = state
+
+      if has_event(:bluetooth_changed)
+        @events[:bluetooth_changed].call(state)
+      end
+      BluetoothChangedKey.post_notification(self, {state: state})
+
       @regions.each do |region_hash|
         region = region_hash[:region]
-        case central.state
+        case state
           when CBCentralManagerStatePoweredOff, CBCentralManagerStateUnsupported, CBCentralManagerStateUnauthorized
             did_exit_region(region)
           when CBCentralManagerStatePoweredOn
