@@ -282,7 +282,7 @@ module Tgios
       stop_listen
       @model=nil
       @decimal_button=nil
-      if !@ui_field.nil? && @ui_field.delegate == self
+      if @ui_field.weakref_alive? && !@ui_field.nil? && @ui_field.delegate == self
         @ui_field.delegate = nil
         toolbar = @ui_field.inputAccessoryView
         toolbar.items = nil unless toolbar.nil?
