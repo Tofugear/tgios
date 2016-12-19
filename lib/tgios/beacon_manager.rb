@@ -253,7 +253,10 @@ module Tgios
         region_hash[:active] = false
 
         location_manager.stopRangingBeaconsInRegion(region)
-        @previous_beacons.delete_if {|b| self.class.beacon_in_region(b, region)}
+        @previous_beacons.delete_if {|b|
+          beacon = b.is_a?(Hash) ? b[:beacon] : b
+          self.class.beacon_in_region(beacon, region)
+        }
         if self.class.beacon_in_region(@current_beacon, region)
           @current_beacon = nil
         end
