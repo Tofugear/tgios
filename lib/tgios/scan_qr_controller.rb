@@ -131,8 +131,9 @@ module Tgios
     def openQRCode(result)
       stop_scanning
 
-      @events[:result_scanned].call(result)
-      self.dismissViewControllerAnimated(true, completion: nil)
+      self.dismissViewControllerAnimated(true, completion: -> {
+            @events[:result_scanned].call(result)
+          })
     end
 
     def stop_scanning
