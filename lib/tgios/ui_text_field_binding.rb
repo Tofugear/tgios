@@ -279,17 +279,21 @@ module Tgios
     end
 
     def onPrepareForRelease
-      stop_listen
-      @model=nil
-      @decimal_button=nil
-      if !@ui_field.nil? && @ui_field.weakref_alive? && @ui_field.delegate == self
-        @ui_field.delegate = nil
-        toolbar = @ui_field.inputAccessoryView
-        toolbar.items = nil unless toolbar.nil?
-        @ui_field.inputAccessoryView = nil
+      begin
+        stop_listen
+        @model=nil
+        @decimal_button=nil
+        if @ui_field.is_a?(WeakRef) && @ui_field.weakref_alive? && !@ui_field.nil? && @ui_field.delegate == self
+          @ui_field.delegate = nil
+          toolbar = @ui_field.inputAccessoryView
+          toolbar.items = nil unless toolbar.nil?
+          @ui_field.inputAccessoryView = nil
+        end
+        @ui_field=nil
+        @events=nil
+      rescue Exception => e
+        NSLog e.inspect
       end
-      @ui_field=nil
-      @events=nil
     end
 
     def dealloc
