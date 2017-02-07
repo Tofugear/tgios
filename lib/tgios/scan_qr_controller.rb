@@ -1,6 +1,6 @@
 module Tgios
   class ScanQrController < UIViewController
-    attr_accessor :types
+    attr_accessor :types, :bottom_text
 
     def viewDidLoad
       super
@@ -74,6 +74,22 @@ module Tgios
       @queue = Dispatch::Queue.new('camQueue')
       @output = AVCaptureMetadataOutput.alloc.init
       @output.setMetadataObjectsDelegate self, queue: @queue.dispatch_object
+
+      if @bottom_text
+        t_frame = layerRect.dup
+        t_frame.origin.y = t_frame.size.height - 18
+        t_frame.size.height = 18
+        text_layer = Base.style(CATextLayer.layer,
+            frame: t_frame,
+            foregroundColor: :white.cgcolor,
+            backgroundColor: :black.cgcolor(0.3),
+            alignmentMode: KCAAlignmentCenter,
+            truncationMode: KCATruncationEnd,
+            fontSize: 14,
+        )
+        self.view.layer.addSublayer(text_layer)
+        text_layer.string = @bottom_text
+      end
 
       camera_size = layerRect.size
       sq_size = 240
