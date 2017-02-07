@@ -76,18 +76,28 @@ module Tgios
       @output.setMetadataObjectsDelegate self, queue: @queue.dispatch_object
 
       if @bottom_text
+        whole_lbl_h = 36
+        lbl_h = 18
         t_frame = layerRect.dup
-        t_frame.origin.y = t_frame.size.height - 18
-        t_frame.size.height = 18
+        t_frame.origin.y = t_frame.size.height - whole_lbl_h
+        t_frame.size.height = whole_lbl_h
+        bg_layer = Base.style(CALayer.layer,
+            frame: t_frame,
+            backgroundColor: :black.cgcolor(0.3),
+        )
+        self.view.layer.addSublayer(bg_layer)
+
+        t_frame.origin.y = (whole_lbl_h - lbl_h)/ 2.0
+        t_frame.size.height = lbl_h
         text_layer = Base.style(CATextLayer.layer,
+            contentsScale: UIScreen.mainScreen.scale,
             frame: t_frame,
             foregroundColor: :white.cgcolor,
-            backgroundColor: :black.cgcolor(0.3),
             alignmentMode: KCAAlignmentCenter,
             truncationMode: KCATruncationEnd,
             fontSize: 14,
         )
-        self.view.layer.addSublayer(text_layer)
+        bg_layer.addSublayer(text_layer)
         text_layer.string = @bottom_text
       end
 
