@@ -76,6 +76,7 @@ module Tgios
     end
 
     def reset_content_inset_bottom
+      return unless @table.weakref_alive?
       @table.contentInset = UIEdgeInsetsZero
       @table.scrollIndicatorInsets = UIEdgeInsetsZero
       @expanding = false
