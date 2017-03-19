@@ -81,9 +81,9 @@ module Tgios
 
     def textFieldDidEndEditing(textField)
       puts "textFieldDidEndEditing"
-      @model.send("#{@field_name}=", textField.text)
+      @model.send("#{@field_name}=", textField.text) if @model.present?
       weak_text_field=WeakRef.new(textField)
-      @events[:end_edit].call(@model, @field_name, {text_field: weak_text_field}) unless @events[:end_edit].nil?
+      @events[:end_edit].call(@model, @field_name, {text_field: weak_text_field}) unless @events.nil? || @events[:end_edit].nil?
       @decimal_button.removeFromSuperview unless @decimal_button.nil?
     end
 
