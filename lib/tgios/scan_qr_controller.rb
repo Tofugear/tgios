@@ -64,42 +64,42 @@ module Tgios
       @error = Pointer.new('@')
       @input = AVCaptureDeviceInput.deviceInputWithDevice @device, error: @error
 
+      if @bottom_text
+        bottom_bg = Base.style(UIView.new, backgroundColor: :black.uicolor(0.3))
+        Motion::Layout.new do |l|
+          l.view self.view
+          l.subviews bg: bottom_bg
+          l.vertical '[bg]|'
+          l.horizontal '|[bg]|'
+        end
+        bottom_label = Base.style(UILabel.new,
+            font: :system.uifont(14),
+            textColor: :white.uicolor,
+            textAlignment: :center.nsalignment,
+            numberOfLines: 0,
+            text: @bottom_text)
+        Motion::Layout.new do |l|
+          l.view bottom_bg
+          l.subviews lbl: bottom_label
+          l.vertical '|-10-[lbl]-10-|'
+          l.horizontal '|-10-[lbl]-10-|'
+        end
+      end
+
       @previewLayer = AVCaptureVideoPreviewLayer.alloc.initWithSession(@session)
       @previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill
       layerRect = self.view.layer.bounds
       @previewLayer.bounds = layerRect
       @previewLayer.setPosition(CGPointMake(CGRectGetMidX(layerRect), CGRectGetMidY(layerRect)))
-      self.view.layer.addSublayer(@previewLayer)
+      if bottom_bg
+        self.view.layer.insertSublayer(@previewLayer, below: bottom_bg.layer)
+      else
+        self.view.layer.addSublayer(@previewLayer)
+      end
 
       @queue = Dispatch::Queue.new('camQueue')
       @output = AVCaptureMetadataOutput.alloc.init
       @output.setMetadataObjectsDelegate self, queue: @queue.dispatch_object
-
-      if @bottom_text
-        whole_lbl_h = 36
-        lbl_h = 18
-        t_frame = layerRect.dup
-        t_frame.origin.y = t_frame.size.height - whole_lbl_h
-        t_frame.size.height = whole_lbl_h
-        bg_layer = Base.style(CALayer.layer,
-            frame: t_frame,
-            backgroundColor: :black.cgcolor(0.3),
-        )
-        self.view.layer.addSublayer(bg_layer)
-
-        t_frame.origin.y = (whole_lbl_h - lbl_h)/ 2.0
-        t_frame.size.height = lbl_h
-        text_layer = Base.style(CATextLayer.layer,
-            contentsScale: UIScreen.mainScreen.scale,
-            frame: t_frame,
-            foregroundColor: :white.cgcolor,
-            alignmentMode: KCAAlignmentCenter,
-            truncationMode: KCATruncationEnd,
-            fontSize: 14,
-        )
-        bg_layer.addSublayer(text_layer)
-        text_layer.string = @bottom_text
-      end
 
       camera_size = layerRect.size
       sq_size = 240
