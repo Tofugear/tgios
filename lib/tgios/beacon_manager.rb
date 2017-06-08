@@ -111,10 +111,10 @@ module Tgios
     def algorithm=(val)
       alg = val.to_s.to_sym
       return unless alg.present?
+      raise ArgumentError.new("Algorithm not found, valid algorithm are: [#{ALGORITHMS.join(', ')}]") unless ALGORITHMS.include?(alg)
       if @algorithm != alg
         @previous_beacons.clear
       end
-      raise ArgumentError.new("Algorithm not found, valid algorithm are: [#{ALGORITHMS.join(', ')}]") unless ALGORITHMS.include?(alg)
 
       @algorithm = alg
     end
@@ -142,8 +142,12 @@ module Tgios
       region_hash = get_region_hash(region)
       return unless region_hash[:active]
 
-      beacons = beacons.sort_by{|b| b.try(@range_method)}
-      beacons = beacons.reverse if @range_method == :rssi
+      beacons = beacons.sort_by{|b|
+        val = b.try(@range_method)
+        val = val * -1 if val && @range_method == :rssi
+        val
+      }
+
       known_beacons = beacons.select{|b| b.proximity != CLProximityUnknown}
       unknown_beacons = beacons - known_beacons
       beacon = nil
@@ -156,9 +160,11 @@ module Tgios
       end
       push_beacon(beacon) # nil value will signify null beacon
 
+      # use known_beacons + unknown_beacons to make sure closest range comes to the top
+      all_beacons = known_beacons + unknown_beacons
+
       if has_event(:beacons_found)
-        # use known_beacons + unknown_beacons to make sure closest range comes to the top
-        @events[:beacons_found].call(beacons_in_range, known_beacons + unknown_beacons, @current_beacon)
+        @events[:beacons_found].call(beacons_in_range, all_beacons, @current_beacon)
       end
 
       if has_event(:beacon_found)
@@ -166,11 +172,14 @@ module Tgios
       end
 
       BeaconFoundKey.post_notification(self, {region: region, beacon: @current_beacon})
-      BeaconsFoundKey.post_notification(self, {region: region, beacon: @current_beacon, beacons_in_range: beacons_in_range, any_beacons: known_beacons + unknown_beacons})
+      BeaconsFoundKey.post_notification(self, {region: region, beacon: @current_beacon, beacons_in_range: beacons_in_range, any_beacons: all_beacons})
     end
 
     def locationManager(manager, rangingBeaconsDidFailForRegion: region, withError: error)
-      @events[:ranging_failed].call(region, error) if has_event(:ranging_failed)
+
+      if has_event(:ranging_failed)
+        @events[:ranging_failed].call(region, error) if has_event(:ranging_failed)
+      end
       RangingFailedKey.post_notification(self, {region: region, error: error})
     end
 
@@ -215,6 +224,7 @@ module Tgios
     end
 
     def stop_monitor
+      NSObject.cancelPreviousPerformRequestsWithTarget(self, selector: 'start_monitor', object: nil) # stop start_monitor if any
       @regions.each do |region_hash|
         region = region_hash[:region]
         location_manager.stopRangingBeaconsInRegion(region)
@@ -272,6 +282,8 @@ module Tgios
     end
 
     def centralManagerDidUpdateState(central)
+      return if @events.nil?
+
       state = central.state
       @current_bluetooth_state = state
 
@@ -295,7 +307,7 @@ module Tgios
     end
 
     def has_event(event)
-      @events.has_key?(event)
+      @events && @events.has_key?(event)
     end
 
     def push_beacon(beacon)
@@ -392,9 +404,11 @@ module Tgios
     end
 
     def onPrepareForRelease
-      UIApplicationWillEnterForegroundNotification.remove_observer(self)
-      UIApplicationDidEnterBackgroundNotification.remove_observer(self)
+      NSNotificationCenter.defaultCenter.removeObserver(self)
+
       stop_monitor
+      @central_manager.delegate = nil
+      @location_manager.delegate = nil
       @location_manager = nil
       @events = nil
       @current_beacon = nil
