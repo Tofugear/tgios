@@ -52,7 +52,7 @@ module Tgios
     def self.simulator?
       @simulator_state ||= begin
         if UIDevice.currentDevice.systemVersion.to_i >= 9
-          !NSBundle.mainBundle.bundlePath.start_with?('/var/')
+          NSBundle.mainBundle.bundlePath !~ /^(\/private)?\/var/
         else
           !(UIDevice.currentDevice.model =~ /simulator/i).nil?
         end
